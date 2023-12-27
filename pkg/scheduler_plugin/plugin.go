@@ -212,10 +212,7 @@ func (pl *KubeThrottler) PreFilter(
 		reasons = append(reasons, fmt.Sprintf("throttle[%s]=%s", schedulev1alpha1.CheckThrottleStatusInsufficient, strings.Join(throttleNames(thrInsufficient), ",")))
 	}
 
-	// TODO(utam0k): Returns a more appropriate type.
-	// If PreFilter returns Unschedulable or UnschedulableAndUnresolvable, preemption will occur.
-	// ref: https://github.com/kubernetes/kubernetes/blob/8a9b209cb11943f4d53a0d840b55cf92ebfbe004/pkg/scheduler/schedule_one.go#L452-L468
-	return nil, framework.NewStatus(framework.Error, reasons...)
+	return nil, framework.NewStatus(framework.UnschedulableAndUnresolvable, reasons...)
 }
 
 func (pl *KubeThrottler) Reserve(
