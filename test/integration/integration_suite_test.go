@@ -90,7 +90,7 @@ func mustStartKubeThrottler() {
 	schedulerConfigPath = schedulerConfigFile.Name()
 	_, err = schedulerConfigFile.Write([]byte(
 		Df(`
-			apiVersion: kubescheduler.config.k8s.io/v1beta3
+			apiVersion: kubescheduler.config.k8s.io/v1
 			kind: KubeSchedulerConfiguration
 			leaderElection:
 			  leaderElect: false
