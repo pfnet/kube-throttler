@@ -20,29 +20,13 @@ package resourcelist
 import (
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
+	v1resource "k8s.io/kubernetes/pkg/api/v1/resource"
 )
 
 type ResourceList corev1.ResourceList
 
 func PodRequestResourceList(pod *corev1.Pod) ResourceList {
-	icRes := ResourceList{}
-	for _, c := range pod.Spec.InitContainers {
-		icRes.SetMax(ResourceList(c.Resources.Requests))
-	}
-
-	cRes := ResourceList{}
-	for _, c := range pod.Spec.Containers {
-		cRes.Add(ResourceList(c.Resources.Requests))
-	}
-
-	cRes.SetMax(icRes)
-
-	// If Overhead is being utilized, add to the total requests for the pod
-	if pod.Spec.Overhead != nil {
-		cRes.Add(ResourceList(pod.Spec.Overhead))
-	}
-
-	return cRes
+	return ResourceList(v1resource.PodRequests(pod, v1resource.PodResourcesOptions{}))
 }
 
 func (lhs ResourceList) Add(rhs ResourceList) {
