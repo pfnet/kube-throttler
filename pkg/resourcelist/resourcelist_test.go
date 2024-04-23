@@ -73,7 +73,7 @@ var _ = Describe("PodResourceRequestList", func() {
 		})
 	})
 
-	Context("with init containers", func() {
+	Context("with regular init containers", func() {
 		It("sets max(max(resources of initContainers), total resources of containers)", func() {
 			p := &corev1.Pod{
 				Spec: corev1.PodSpec{
@@ -111,6 +111,43 @@ var _ = Describe("PodResourceRequestList", func() {
 			Expect(r.EqualTo(ResourceList(corev1.ResourceList{
 				"n1": two,
 				"n2": two,
+			}))).Should(Equal(true))
+		})
+	})
+
+	Context("with restartable init containers", func() {
+		It("sets max(max(resources of regular initContainers), total resources of containers and restartable containers)", func() {
+			restartPolicy := corev1.ContainerRestartPolicyAlways
+			p := &corev1.Pod{
+				Spec: corev1.PodSpec{
+					InitContainers: []corev1.Container{{
+						Resources: corev1.ResourceRequirements{
+							Requests: corev1.ResourceList{
+								"n1": one,
+							},
+						},
+						RestartPolicy: &restartPolicy,
+					}, {
+						Resources: corev1.ResourceRequirements{
+							Requests: corev1.ResourceList{
+								"n1": one,
+							},
+						},
+					}},
+					Containers: []corev1.Container{{
+						Resources: corev1.ResourceRequirements{
+							Requests: corev1.ResourceList{
+								"n1": one,
+							},
+						},
+					}},
+				},
+			}
+
+			r := PodRequestResourceList(p)
+
+			Expect(r.EqualTo(ResourceList(corev1.ResourceList{
+				"n1": two,
 			}))).Should(Equal(true))
 		})
 	})
