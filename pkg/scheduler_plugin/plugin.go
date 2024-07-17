@@ -46,9 +46,10 @@ const (
 )
 
 type KubeThrottler struct {
-	fh                 framework.Handle
-	throttleCtr        *controllers.ThrottleController
-	clusterThrottleCtr *controllers.ClusterThrottleController
+	fh                  framework.Handle
+	throttleCtr         *controllers.ThrottleController
+	clusterThrottleCtr  *controllers.ClusterThrottleController
+	groupNameAnnotation string
 }
 
 var _ framework.PreFilterPlugin = &KubeThrottler{}
@@ -135,9 +136,10 @@ func NewPlugin(ctx context.Context, configuration runtime.Object, fh framework.H
 	}
 
 	pl := KubeThrottler{
-		fh:                 fh,
-		throttleCtr:        throttleController,
-		clusterThrottleCtr: clusterthrottleController,
+		fh:                  fh,
+		throttleCtr:         throttleController,
+		clusterThrottleCtr:  clusterthrottleController,
+		groupNameAnnotation: kubeThrottlerArgs.GroupNameAnnotation,
 	}
 
 	return &pl, nil
@@ -160,7 +162,7 @@ func (pl *KubeThrottler) PreFilter(
 		"#AffectedThrottles", len(thrAffected),
 	)
 
-	clthrActive, clthrInsufficient, clthrPodRequestsExceeds, clThrAffected, err := pl.clusterThrottleCtr.CheckThrottled(pod, false)
+	clthrActive, clthrInsufficient, clthrInsufficientGroup, clthrPodRequestsExceeds, clThrAffected, err := pl.clusterThrottleCtr.CheckThrottled(pod, false, pl.groupNameAnnotation)
 	if err != nil {
 		return nil, framework.NewStatus(framework.Error, err.Error())
 	}
@@ -168,12 +170,13 @@ func (pl *KubeThrottler) PreFilter(
 		"Pod", pod.Namespace+"/"+pod.Name,
 		"#ActiveClusterThrottles", len(clthrActive),
 		"#InsufficientClusterThrottles", len(clthrInsufficient),
+		"#InsufficientClusterThrottlesIncludingGroup", len(clthrInsufficientGroup),
 		"#PodRequestsExceedsThresholdClusterThrottles", len(clthrPodRequestsExceeds),
 		"#AffectedClusterThrottles", len(clThrAffected),
 	)
 
 	if len(thrActive)+len(thrInsufficient)+len(thrPodRequestsExceeds)+
-		len(clthrActive)+len(clthrInsufficient)+len(clthrPodRequestsExceeds) == 0 {
+		len(clthrActive)+len(clthrInsufficient)+len(clthrInsufficientGroup)+len(clthrPodRequestsExceeds) == 0 {
 		return nil, framework.NewStatus(framework.Success)
 	}
 
@@ -205,6 +208,9 @@ func (pl *KubeThrottler) PreFilter(
 	}
 	if len(clthrInsufficient) != 0 {
 		reasons = append(reasons, fmt.Sprintf("clusterthrottle[%s]=%s", schedulev1alpha1.CheckThrottleStatusInsufficient, strings.Join(clusterThrottleNames(clthrInsufficient), ",")))
+	}
+	if len(clthrInsufficientGroup) != 0 {
+		reasons = append(reasons, fmt.Sprintf("clusterthrottle[%s]=%s", schedulev1alpha1.CheckThrottleStatusInsufficientIncludingPodGroup, strings.Join(clusterThrottleNames(clthrInsufficientGroup), ",")))
 	}
 	if len(thrInsufficient) != 0 {
 		reasons = append(reasons, fmt.Sprintf("throttle[%s]=%s", schedulev1alpha1.CheckThrottleStatusInsufficient, strings.Join(throttleNames(thrInsufficient), ",")))

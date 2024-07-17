@@ -27,7 +27,7 @@ type ClusterThrottleSpec struct {
 	Selector         ClusterThrottleSelector `json:"selector,omitempty"`
 }
 
-func (thr ClusterThrottle) CheckThrottledFor(pod *corev1.Pod, reservedResourceAmount ResourceAmount, isThrottledOnEqual bool) CheckThrottleStatus {
+func (thr ClusterThrottle) CheckThrottledFor(pod *corev1.Pod, reservedResourceAmount ResourceAmount, usedByGroup ResourceAmount, isThrottledOnEqual bool) CheckThrottleStatus {
 	threshold := thr.Spec.Threshold
 	if !thr.Status.CalculatedThreshold.CalculatedAt.Time.IsZero() {
 		threshold = thr.Status.CalculatedThreshold.Threshold
@@ -46,9 +46,14 @@ func (thr ClusterThrottle) CheckThrottledFor(pod *corev1.Pod, reservedResourceAm
 		return CheckThrottleStatusActive
 	}
 
-	used := ResourceAmount{}.Add(thr.Status.Used).Add(ResourceAmountOfPod(pod)).Add(reservedResourceAmount)
-	if threshold.IsThrottled(used, isThrottledOnEqual).IsThrottledFor(pod) {
+	usedWithPod := alreadyUsed.Add(ResourceAmountOfPod(pod))
+	if threshold.IsThrottled(usedWithPod, isThrottledOnEqual).IsThrottledFor(pod) {
 		return CheckThrottleStatusInsufficient
+	}
+
+	usedWithGroup := usedWithPod.Add(usedByGroup)
+	if threshold.IsThrottled(usedWithGroup, isThrottledOnEqual).IsThrottledFor(pod) {
+		return CheckThrottleStatusInsufficientIncludingPodGroup
 	}
 
 	return CheckThrottleStatusNotThrottled

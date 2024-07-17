@@ -24,6 +24,7 @@ import (
 	"github.com/everpeace/kube-throttler/pkg/apis/schedule/v1alpha1"
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
+	"github.com/onsi/gomega/types"
 	corev1 "k8s.io/api/core/v1"
 )
 
@@ -161,8 +162,49 @@ var _ = Describe("Clusterthrottle Test", func() {
 				Consistently(PodIsNotScheduled(ctx, DefaultNs, pod.Name)).Should(Succeed())
 			})
 		})
+		Context("Pod Group", func() {
+			var (
+				podPassedGroup    []*corev1.Pod
+				podThrottledGroup []*corev1.Pod
+			)
+			BeforeEach(func() {
+				for i := 0; i < 2; i++ {
+					podPassedGroup = append(podPassedGroup, MustCreatePod(ctx, MakePod(DefaultNs, fmt.Sprintf("passed-pod%d", i), "50m").Annotation(groupNameAnnotation, "passed").Label(throttleKey, throttleName).Obj()))
+				}
+				for i := 0; i < 3; i++ {
+					podThrottledGroup = append(podThrottledGroup, MustCreatePod(ctx, MakePod(DefaultNs, fmt.Sprintf("throttled-pod%d", i), "50m").Annotation(groupNameAnnotation, "throttled").Label(throttleKey, throttleName).Obj()))
+				}
+			})
+			It("should not schedule pod3", func() {
+				Eventually(AsyncAll(
+					WakeupBackoffPod(ctx),
+					ClusterThottleHasStatus(
+						ctx, thr.Name,
+						ClthrOpts.WithCalculatedThreshold(thr.Spec.Threshold),
+						ClthrOpts.WithPodThrottled(true),
+						ClthrOpts.WithUsedPod(len(podPassedGroup)),
+						ClthrOpts.WithUsedCpuReq(fmt.Sprintf("%dm", len(podPassedGroup)*50)),
+						ClthrOpts.WithCpuThrottled(false),
+					),
+					func(g types.Gomega) {
+						for _, pod := range podPassedGroup {
+							PodIsScheduled(ctx, DefaultNs, pod.Name)
+						}
+					},
+					func(g types.Gomega) {
+						for _, pod := range podThrottledGroup {
+							MustPodFailedScheduling(ctx, DefaultNs, pod.Name, v1alpha1.CheckThrottleStatusInsufficientIncludingPodGroup)
+						}
+					},
+				)).Should(Succeed())
+				Consistently(func(g types.Gomega) {
+					for _, pod := range podPassedGroup {
+						PodIsScheduled(ctx, DefaultNs, pod.Name)
+					}
+				}).Should(Succeed())
+			})
+		})
 	})
-
 	When("Many pods are created at once", func() {
 		var thr *v1alpha1.ClusterThrottle
 		var scheduled = make([]*corev1.Pod, 20)
