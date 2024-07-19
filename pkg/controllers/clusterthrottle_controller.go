@@ -380,22 +380,17 @@ func (c *ClusterThrottleController) CheckThrottled(
 	isThrottledOnEqual bool,
 	groupNameAnnotation string,
 ) (
-	[]schedulev1alpha1.ClusterThrottle,
-	[]schedulev1alpha1.ClusterThrottle,
-	[]schedulev1alpha1.ClusterThrottle,
-	[]schedulev1alpha1.ClusterThrottle,
-	[]schedulev1alpha1.ClusterThrottle,
-	error,
+	alreadyThrottled []schedulev1alpha1.ClusterThrottle,
+	insufficient []schedulev1alpha1.ClusterThrottle,
+	insufficientIncludingGroup []schedulev1alpha1.ClusterThrottle,
+	podRequestsExceedsThreshold []schedulev1alpha1.ClusterThrottle,
+	affected []schedulev1alpha1.ClusterThrottle,
+	_ error,
 ) {
 	throttles, err := c.affectedClusterThrottles(pod)
 	if err != nil {
 		return nil, nil, nil, nil, nil, err
 	}
-	affected := []schedulev1alpha1.ClusterThrottle{}
-	alreadyThrottled := []schedulev1alpha1.ClusterThrottle{}
-	insufficient := []schedulev1alpha1.ClusterThrottle{}
-	insufficientIncludingGroup := []schedulev1alpha1.ClusterThrottle{}
-	podRequestsExceedsThreshold := []schedulev1alpha1.ClusterThrottle{}
 
 	// Fetch the pods which have group name's annotation
 	var podGroup []*corev1.Pod
@@ -430,14 +425,14 @@ func (c *ClusterThrottleController) CheckThrottled(
 		affected = append(affected, *thr)
 		reservedAmt, reservedPodNNs := c.cache.reservedResourceAmount(types.NamespacedName{Namespace: thr.Namespace, Name: thr.Name})
 
-		usedInGroup := schedulev1alpha1.ResourceAmount{}
+		requestedByGroup := schedulev1alpha1.ResourceAmount{}
 		for _, groupPod := range podGroup {
 			ns, err := c.namespaceInformer.Lister().Get(groupPod.Namespace)
 			if err != nil {
 				return nil, nil, nil, nil, nil, err
 			}
 
-			// If a pod of a group is already counted, skip it because it'll be counted as a reserved resrouce amount.
+			// If a pod of a group is already counted, skip it because it'll be counted as a reserved resource amount.
 			thrnn := types.NamespacedName{Namespace: thr.Namespace, Name: thr.Name}
 			if c.cache.exist(thrnn, groupPod) {
 				continue
@@ -451,13 +446,13 @@ func (c *ClusterThrottleController) CheckThrottled(
 				continue
 			}
 
-			usedInGroup = usedInGroup.Add(schedulev1alpha1.ResourceAmountOfPod(groupPod))
+			requestedByGroup = requestedByGroup.Add(schedulev1alpha1.ResourceAmountOfPod(groupPod))
 		}
 
 		checkStatus := thr.CheckThrottledFor(
 			pod,
 			reservedAmt,
-			usedInGroup,
+			requestedByGroup,
 			isThrottledOnEqual,
 		)
 		klog.V(3).InfoS("CheckThrottled result",
@@ -467,7 +462,7 @@ func (c *ClusterThrottleController) CheckThrottled(
 			"Threashold", thr.Status.CalculatedThreshold.Threshold,
 			"RequestedByPod", schedulev1alpha1.ResourceAmountOfPod(pod),
 			"UsedInClusterThrottle", thr.Status.Used,
-			"UsedInPodGroup", usedInGroup,
+			"ReqeustedByPodGroup", requestedByGroup,
 			"ReservedAmountInScheduler", reservedAmt,
 			"ReservedPodsInScheduler", strings.Join(sets.List(reservedPodNNs), ","),
 			"AmountForCheck", schedulev1alpha1.ResourceAmount{}.Add(thr.Status.Used).Add(schedulev1alpha1.ResourceAmountOfPod(pod)).Add(reservedAmt),

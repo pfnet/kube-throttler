@@ -162,49 +162,59 @@ var _ = Describe("Clusterthrottle Test", func() {
 				Consistently(PodIsNotScheduled(ctx, DefaultNs, pod.Name)).Should(Succeed())
 			})
 		})
-		Context("Pod Group", func() {
-			var (
-				podPassedGroup    []*corev1.Pod
-				podThrottledGroup []*corev1.Pod
+	})
+
+	When("Group Pods", func() {
+		var (
+			podPassedGroup    []*corev1.Pod
+			thr               *v1alpha1.ClusterThrottle
+			podThrottledGroup []*corev1.Pod
+		)
+		BeforeEach(func() {
+			thr = MustCreateClusterThrottle(ctx,
+				MakeClusterThrottle(throttleName).Selector(DefaultNs, throttleKey, throttleName).
+					ThresholdPod(4).
+					ThresholdCpu("4").
+					Obj(),
 			)
-			BeforeEach(func() {
-				for i := 0; i < 2; i++ {
-					podPassedGroup = append(podPassedGroup, MustCreatePod(ctx, MakePod(DefaultNs, fmt.Sprintf("passed-pod%d", i), "50m").Annotation(groupNameAnnotation, "passed").Label(throttleKey, throttleName).Obj()))
-				}
-				for i := 0; i < 3; i++ {
-					podThrottledGroup = append(podThrottledGroup, MustCreatePod(ctx, MakePod(DefaultNs, fmt.Sprintf("throttled-pod%d", i), "50m").Annotation(groupNameAnnotation, "throttled").Label(throttleKey, throttleName).Obj()))
-				}
-			})
-			It("should not schedule pod3", func() {
-				Eventually(AsyncAll(
-					WakeupBackoffPod(ctx),
-					ClusterThottleHasStatus(
-						ctx, thr.Name,
-						ClthrOpts.WithCalculatedThreshold(thr.Spec.Threshold),
-						ClthrOpts.WithPodThrottled(true),
-						ClthrOpts.WithUsedPod(len(podPassedGroup)),
-						ClthrOpts.WithUsedCpuReq(fmt.Sprintf("%dm", len(podPassedGroup)*50)),
-						ClthrOpts.WithCpuThrottled(false),
-					),
-					func(g types.Gomega) {
-						for _, pod := range podPassedGroup {
-							PodIsScheduled(ctx, DefaultNs, pod.Name)
-						}
-					},
-					func(g types.Gomega) {
-						for _, pod := range podThrottledGroup {
-							MustPodFailedScheduling(ctx, DefaultNs, pod.Name, v1alpha1.CheckThrottleStatusInsufficientIncludingPodGroup)
-						}
-					},
-				)).Should(Succeed())
-				Consistently(func(g types.Gomega) {
+
+			for i := 0; i < 2; i++ {
+				podPassedGroup = append(podPassedGroup, MustCreatePod(ctx, MakePod(DefaultNs, fmt.Sprintf("passed-pod%d", i), "100m").Annotation(groupNameAnnotation, "passed").Label(throttleKey, throttleName).Obj()))
+			}
+			for i := 0; i < 3; i++ {
+				podThrottledGroup = append(podThrottledGroup, MustCreatePod(ctx, MakePod(DefaultNs, fmt.Sprintf("throttled-pod%d", i), "100m").Annotation(groupNameAnnotation, "throttled").Label(throttleKey, throttleName).Obj()))
+			}
+		})
+		It("should not schedule podThrottledGroup", func() {
+			Eventually(AsyncAll(
+				WakeupBackoffPod(ctx),
+				ClusterThottleHasStatus(
+					ctx, thr.Name,
+					ClthrOpts.WithCalculatedThreshold(thr.Spec.Threshold),
+					ClthrOpts.WithUsedPod(len(podPassedGroup)),
+					ClthrOpts.WithUsedCpuReq(fmt.Sprintf("%dm", len(podPassedGroup)*100)),
+					ClthrOpts.WithPodThrottled(false),
+					ClthrOpts.WithCpuThrottled(false),
+				),
+				func(g types.Gomega) {
 					for _, pod := range podPassedGroup {
 						PodIsScheduled(ctx, DefaultNs, pod.Name)
 					}
-				}).Should(Succeed())
-			})
+				},
+				func(g types.Gomega) {
+					for _, pod := range podThrottledGroup {
+						MustPodFailedScheduling(ctx, DefaultNs, pod.Name, v1alpha1.CheckThrottleStatusInsufficientIncludingPodGroup)
+					}
+				},
+			)).Should(Succeed())
+			Consistently(func(g types.Gomega) {
+				for _, pod := range podPassedGroup {
+					PodIsScheduled(ctx, DefaultNs, pod.Name)
+				}
+			}).Should(Succeed())
 		})
 	})
+
 	When("Many pods are created at once", func() {
 		var thr *v1alpha1.ClusterThrottle
 		var scheduled = make([]*corev1.Pod, 20)
