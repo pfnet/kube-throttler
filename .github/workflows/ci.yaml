@@ -71,4 +71,4 @@ jobs:
     - name: Validate GoReleaser
       uses: goreleaser/goreleaser-action@v2
       with:
-        args: release --snapshot --skip-publish --rm-dist --debug
+        args: release --snapshot --skip=publish --clean
