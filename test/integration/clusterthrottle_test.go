@@ -20,12 +20,17 @@ package integration
 import (
 	"context"
 	"fmt"
+	"time"
 
 	"github.com/everpeace/kube-throttler/pkg/apis/schedule/v1alpha1"
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 	"github.com/onsi/gomega/types"
 	corev1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	k8stypes "k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/wait"
+	corev1apply "k8s.io/client-go/applyconfigurations/core/v1"
 )
 
 var _ = Describe("Clusterthrottle Test", func() {
@@ -181,8 +186,34 @@ var _ = Describe("Clusterthrottle Test", func() {
 			for i := 0; i < 2; i++ {
 				podPassedGroup = append(podPassedGroup, MustCreatePod(ctx, MakePod(DefaultNs, fmt.Sprintf("passed-pod%d", i), "100m").Annotation(groupNameAnnotation, "passed").Label(throttleKey, throttleName).Obj()))
 			}
+
+			err := wait.PollUntilContextTimeout(ctx, 100*time.Millisecond, time.Second, false, func(context.Context) (bool, error) {
+				for _, pod := range podPassedGroup {
+					got, err := k8sCli.CoreV1().Pods(pod.Namespace).Get(ctx, pod.Name, metav1.GetOptions{})
+					if err != nil {
+						return false, err
+					}
+					if got.Spec.NodeName == "" {
+						return false, nil
+					}
+				}
+
+				return true, nil
+			})
+			Expect(err).NotTo(HaveOccurred())
+
 			for i := 0; i < 3; i++ {
-				podThrottledGroup = append(podThrottledGroup, MustCreatePod(ctx, MakePod(DefaultNs, fmt.Sprintf("throttled-pod%d", i), "100m").Annotation(groupNameAnnotation, "throttled").Label(throttleKey, throttleName).Obj()))
+				pod := MakePod(DefaultNs, fmt.Sprintf("throttled-pod%d", i), "100m").Annotation(groupNameAnnotation, "throttled").Label(throttleKey, throttleName).Obj()
+				pod.Spec.SchedulingGates = []corev1.PodSchedulingGate{{Name: "group"}}
+				pod = MustCreatePod(ctx, pod)
+				podThrottledGroup = append(podThrottledGroup, pod)
+			}
+
+			for _, pod := range podThrottledGroup {
+				applyConfig := corev1apply.Pod(pod.Name, pod.Namespace).WithSpec(corev1apply.PodSpec())
+				applyConfig.Spec.SchedulingGates = nil
+				_, err := k8sCli.CoreV1().Pods(pod.Namespace).Patch(ctx, pod.Name, k8stypes.StrategicMergePatchType, []byte(`{"spec":{"schedulingGates":null}}`), metav1.PatchOptions{})
+				Expect(err).NotTo(HaveOccurred())
 			}
 		})
 		It("should not schedule podThrottledGroup", func() {
