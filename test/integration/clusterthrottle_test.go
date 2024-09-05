@@ -217,6 +217,12 @@ var _ = Describe("Clusterthrottle Test", func() {
 			}
 		})
 		It("should not schedule podThrottledGroup", func() {
+			for _, pod := range podPassedGroup {
+				Eventually(PodIsScheduled(ctx, DefaultNs, pod.Name)).Should(Succeed())
+			}
+			for _, pod := range podThrottledGroup {
+				Eventually(MustPodFailedScheduling(ctx, DefaultNs, pod.Name, v1alpha1.CheckThrottleStatusInsufficientIncludingPodGroup)).Should(Succeed())
+			}
 			Eventually(AsyncAll(
 				WakeupBackoffPod(ctx),
 				ClusterThottleHasStatus(
@@ -227,16 +233,6 @@ var _ = Describe("Clusterthrottle Test", func() {
 					ClthrOpts.WithPodThrottled(false),
 					ClthrOpts.WithCpuThrottled(false),
 				),
-				func(g types.Gomega) {
-					for _, pod := range podPassedGroup {
-						PodIsScheduled(ctx, DefaultNs, pod.Name)
-					}
-				},
-				func(g types.Gomega) {
-					for _, pod := range podThrottledGroup {
-						MustPodFailedScheduling(ctx, DefaultNs, pod.Name, v1alpha1.CheckThrottleStatusInsufficientIncludingPodGroup)
-					}
-				},
 			)).Should(Succeed())
 			Consistently(func(g types.Gomega) {
 				for _, pod := range podPassedGroup {
