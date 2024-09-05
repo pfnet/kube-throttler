@@ -202,6 +202,7 @@ var _ = Describe("Clusterthrottle Test", func() {
 			})
 			Expect(err).NotTo(HaveOccurred())
 
+			// Make all the Pods once to prevent them from reaching PreFilter one by one before all the Pods in the PodGroup are created.
 			for i := 0; i < 3; i++ {
 				pod := MakePod(DefaultNs, fmt.Sprintf("throttled-pod%d", i), "100m").Annotation(groupNameAnnotation, "throttled").Label(throttleKey, throttleName).Obj()
 				pod.Spec.SchedulingGates = []corev1.PodSchedulingGate{{Name: "group"}}
