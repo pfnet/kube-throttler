@@ -30,7 +30,6 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	k8stypes "k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/wait"
-	corev1apply "k8s.io/client-go/applyconfigurations/core/v1"
 )
 
 var _ = Describe("Clusterthrottle Test", func() {
