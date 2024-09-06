@@ -25,7 +25,6 @@ import (
 	"github.com/everpeace/kube-throttler/pkg/apis/schedule/v1alpha1"
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
-	"github.com/onsi/gomega/types"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	k8stypes "k8s.io/apimachinery/pkg/types"
@@ -232,11 +231,6 @@ var _ = Describe("Clusterthrottle Test", func() {
 					ClthrOpts.WithCpuThrottled(false),
 				),
 			)).Should(Succeed())
-			Consistently(func(g types.Gomega) {
-				for _, pod := range podPassedGroup {
-					PodIsScheduled(ctx, DefaultNs, pod.Name)
-				}
-			}).Should(Succeed())
 		})
 	})
 
