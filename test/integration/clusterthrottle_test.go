@@ -211,8 +211,6 @@ var _ = Describe("Clusterthrottle Test", func() {
 			}
 
 			for _, pod := range podThrottledGroup {
-				applyConfig := corev1apply.Pod(pod.Name, pod.Namespace).WithSpec(corev1apply.PodSpec())
-				applyConfig.Spec.SchedulingGates = nil
 				_, err := k8sCli.CoreV1().Pods(pod.Namespace).Patch(ctx, pod.Name, k8stypes.StrategicMergePatchType, []byte(`{"spec":{"schedulingGates":null}}`), metav1.PatchOptions{})
 				Expect(err).NotTo(HaveOccurred())
 			}
