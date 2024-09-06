@@ -63,6 +63,16 @@ func (c *reservedResourceAmounts) getPodResourceAmountMap(nn types.NamespacedNam
 	return c.cache[nn]
 }
 
+func (c *reservedResourceAmounts) exist(nn types.NamespacedName, pod *corev1.Pod) bool {
+	c.keyMutex.LockKey(nn.String())
+	defer func() {
+		_ = c.keyMutex.UnlockKey(nn.String())
+	}()
+
+	m := c.getPodResourceAmountMap(nn)
+	return m.exist(types.NamespacedName{Namespace: pod.Namespace, Name: pod.Name})
+}
+
 func (c *reservedResourceAmounts) addPod(nn types.NamespacedName, pod *corev1.Pod) bool {
 	c.keyMutex.LockKey(nn.String())
 	defer func() {
@@ -142,6 +152,11 @@ func (c podResourceAmountMap) remove(pod *corev1.Pod) bool {
 func (c podResourceAmountMap) removeByNN(nn types.NamespacedName) bool {
 	_, ok := c[nn]
 	delete(c, nn)
+	return ok
+}
+
+func (c podResourceAmountMap) exist(nn types.NamespacedName) bool {
+	_, ok := c[nn]
 	return ok
 }
 

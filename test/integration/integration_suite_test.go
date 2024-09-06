@@ -40,9 +40,10 @@ import (
 )
 
 const (
-	SchedulerName = "kube-throttler-integration"
-	ThrottlerName = "kube-throttler"
-	DefaultNs     = "default"
+	SchedulerName       = "kube-throttler-integration"
+	ThrottlerName       = "kube-throttler"
+	DefaultNs           = "default"
+	groupNameAnnotation = "scheduling.k8s.pfn.io/group-name"
 )
 
 var (
@@ -111,12 +112,13 @@ func mustStartKubeThrottler() {
 			      name: %s
 			      targetSchedulerName: %s
 			      kubeconfig: %s
+			      groupNameAnnotation: %s
 			      controllerThrediness: 64
 			      numKeyMutex: 128
 		`,
-			kubeConfigPath,                               // clientConnection.kubeconfig
-			SchedulerName,                                // prifiles[0].scedulerName
-			ThrottlerName, SchedulerName, kubeConfigPath, // profiles[0].pluginConfig[0].args
+			kubeConfigPath,                                                    // clientConnection.kubeconfig
+			SchedulerName,                                                     // prifiles[0].scedulerName
+			ThrottlerName, SchedulerName, kubeConfigPath, groupNameAnnotation, // profiles[0].pluginConfig[0].args
 		),
 	))
 	Expect(err).NotTo(HaveOccurred())

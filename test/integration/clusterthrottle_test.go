@@ -20,11 +20,15 @@ package integration
 import (
 	"context"
 	"fmt"
+	"time"
 
 	"github.com/everpeace/kube-throttler/pkg/apis/schedule/v1alpha1"
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 	corev1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	k8stypes "k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/wait"
 )
 
 var _ = Describe("Clusterthrottle Test", func() {
@@ -160,6 +164,73 @@ var _ = Describe("Clusterthrottle Test", func() {
 				)).Should(Succeed())
 				Consistently(PodIsNotScheduled(ctx, DefaultNs, pod.Name)).Should(Succeed())
 			})
+		})
+	})
+
+	When("Group Pods", func() {
+		var (
+			podPassedGroup    []*corev1.Pod
+			thr               *v1alpha1.ClusterThrottle
+			podThrottledGroup []*corev1.Pod
+		)
+		BeforeEach(func() {
+			thr = MustCreateClusterThrottle(ctx,
+				MakeClusterThrottle(throttleName).Selector(DefaultNs, throttleKey, throttleName).
+					ThresholdPod(4).
+					ThresholdCpu("4").
+					Obj(),
+			)
+
+			for i := 0; i < 2; i++ {
+				podPassedGroup = append(podPassedGroup, MustCreatePod(ctx, MakePod(DefaultNs, fmt.Sprintf("passed-pod%d", i), "100m").Annotation(groupNameAnnotation, "passed").Label(throttleKey, throttleName).Obj()))
+			}
+
+			err := wait.PollUntilContextTimeout(ctx, 100*time.Millisecond, time.Second, false, func(context.Context) (bool, error) {
+				for _, pod := range podPassedGroup {
+					got, err := k8sCli.CoreV1().Pods(pod.Namespace).Get(ctx, pod.Name, metav1.GetOptions{})
+					if err != nil {
+						return false, err
+					}
+					if got.Spec.NodeName == "" {
+						return false, nil
+					}
+				}
+
+				return true, nil
+			})
+			Expect(err).NotTo(HaveOccurred())
+
+			// Make all the Pods once to prevent them from reaching PreFilter one by one before all the Pods in the PodGroup are created.
+			for i := 0; i < 3; i++ {
+				pod := MakePod(DefaultNs, fmt.Sprintf("throttled-pod%d", i), "100m").Annotation(groupNameAnnotation, "throttled").Label(throttleKey, throttleName).Obj()
+				pod.Spec.SchedulingGates = []corev1.PodSchedulingGate{{Name: "group"}}
+				pod = MustCreatePod(ctx, pod)
+				podThrottledGroup = append(podThrottledGroup, pod)
+			}
+
+			for _, pod := range podThrottledGroup {
+				_, err := k8sCli.CoreV1().Pods(pod.Namespace).Patch(ctx, pod.Name, k8stypes.StrategicMergePatchType, []byte(`{"spec":{"schedulingGates":null}}`), metav1.PatchOptions{})
+				Expect(err).NotTo(HaveOccurred())
+			}
+		})
+		It("should not schedule podThrottledGroup", func() {
+			for _, pod := range podPassedGroup {
+				Eventually(PodIsScheduled(ctx, DefaultNs, pod.Name)).Should(Succeed())
+			}
+			for _, pod := range podThrottledGroup {
+				Eventually(MustPodFailedScheduling(ctx, DefaultNs, pod.Name, v1alpha1.CheckThrottleStatusInsufficientIncludingPodGroup)).Should(Succeed())
+			}
+			Eventually(AsyncAll(
+				WakeupBackoffPod(ctx),
+				ClusterThottleHasStatus(
+					ctx, thr.Name,
+					ClthrOpts.WithCalculatedThreshold(thr.Spec.Threshold),
+					ClthrOpts.WithUsedPod(len(podPassedGroup)),
+					ClthrOpts.WithUsedCpuReq(fmt.Sprintf("%dm", len(podPassedGroup)*100)),
+					ClthrOpts.WithPodThrottled(false),
+					ClthrOpts.WithCpuThrottled(false),
+				),
+			)).Should(Succeed())
 		})
 	})
 

@@ -378,27 +378,81 @@ func (c *ClusterThrottleController) UnReserveOnClusterThrottle(pod *corev1.Pod, 
 func (c *ClusterThrottleController) CheckThrottled(
 	pod *corev1.Pod,
 	isThrottledOnEqual bool,
+	groupNameAnnotation string,
 ) (
-	[]schedulev1alpha1.ClusterThrottle,
-	[]schedulev1alpha1.ClusterThrottle,
-	[]schedulev1alpha1.ClusterThrottle,
-	[]schedulev1alpha1.ClusterThrottle,
-	error,
+	alreadyThrottled []schedulev1alpha1.ClusterThrottle,
+	insufficient []schedulev1alpha1.ClusterThrottle,
+	insufficientIncludingGroup []schedulev1alpha1.ClusterThrottle,
+	podRequestsExceedsThreshold []schedulev1alpha1.ClusterThrottle,
+	affected []schedulev1alpha1.ClusterThrottle,
+	_ error,
 ) {
 	throttles, err := c.affectedClusterThrottles(pod)
 	if err != nil {
-		return nil, nil, nil, nil, err
+		return nil, nil, nil, nil, nil, err
 	}
-	affected := []schedulev1alpha1.ClusterThrottle{}
-	alreadyThrottled := []schedulev1alpha1.ClusterThrottle{}
-	insufficient := []schedulev1alpha1.ClusterThrottle{}
-	podRequestsExceedsThreshold := []schedulev1alpha1.ClusterThrottle{}
+
+	// Fetch the pods which have group name's annotation
+	var podGroup []*corev1.Pod
+	if groupNameAnnotation != "" {
+		groupName, isGroup := pod.Annotations[groupNameAnnotation]
+		if isGroup {
+			candidatePods, err := c.podInformer.Lister().Pods(pod.Namespace).List(labels.Everything())
+			if err != nil {
+				return nil, nil, nil, nil, nil, err
+			}
+
+			for _, candidatePod := range candidatePods {
+				if isScheduled(candidatePod) {
+					continue
+				}
+
+				if gn, ok := candidatePod.Annotations[groupNameAnnotation]; !ok || gn != groupName {
+					continue
+				}
+
+				// Don't count the scheduling pod itself.
+				if candidatePod.UID == pod.UID {
+					continue
+				}
+
+				podGroup = append(podGroup, candidatePod)
+			}
+		}
+	}
+
 	for _, thr := range throttles {
 		affected = append(affected, *thr)
 		reservedAmt, reservedPodNNs := c.cache.reservedResourceAmount(types.NamespacedName{Namespace: thr.Namespace, Name: thr.Name})
+
+		requestedByGroup := schedulev1alpha1.ResourceAmount{}
+		for _, groupPod := range podGroup {
+			ns, err := c.namespaceInformer.Lister().Get(groupPod.Namespace)
+			if err != nil {
+				return nil, nil, nil, nil, nil, err
+			}
+
+			// If a pod of a group is already counted, skip it because it'll be counted as a reserved resource amount.
+			thrnn := types.NamespacedName{Namespace: thr.Namespace, Name: thr.Name}
+			if c.cache.exist(thrnn, groupPod) {
+				continue
+			}
+
+			match, err := thr.Spec.Selector.MatchesToPod(groupPod, ns)
+			if err != nil {
+				return nil, nil, nil, nil, nil, err
+			}
+			if !match {
+				continue
+			}
+
+			requestedByGroup = requestedByGroup.Add(schedulev1alpha1.ResourceAmountOfPod(groupPod))
+		}
+
 		checkStatus := thr.CheckThrottledFor(
 			pod,
 			reservedAmt,
+			requestedByGroup,
 			isThrottledOnEqual,
 		)
 		klog.V(3).InfoS("CheckThrottled result",
@@ -408,6 +462,7 @@ func (c *ClusterThrottleController) CheckThrottled(
 			"Threashold", thr.Status.CalculatedThreshold.Threshold,
 			"RequestedByPod", schedulev1alpha1.ResourceAmountOfPod(pod),
 			"UsedInClusterThrottle", thr.Status.Used,
+			"ReqeustedByPodGroup", requestedByGroup,
 			"ReservedAmountInScheduler", reservedAmt,
 			"ReservedPodsInScheduler", strings.Join(sets.List(reservedPodNNs), ","),
 			"AmountForCheck", schedulev1alpha1.ResourceAmount{}.Add(thr.Status.Used).Add(schedulev1alpha1.ResourceAmountOfPod(pod)).Add(reservedAmt),
@@ -417,11 +472,13 @@ func (c *ClusterThrottleController) CheckThrottled(
 			alreadyThrottled = append(alreadyThrottled, *thr)
 		case schedulev1alpha1.CheckThrottleStatusInsufficient:
 			insufficient = append(insufficient, *thr)
+		case schedulev1alpha1.CheckThrottleStatusInsufficientIncludingPodGroup:
+			insufficientIncludingGroup = append(insufficientIncludingGroup, *thr)
 		case schedulev1alpha1.CheckThrottleStatusPodRequestsExceedsThreshold:
 			podRequestsExceedsThreshold = append(podRequestsExceedsThreshold, *thr)
 		}
 	}
-	return alreadyThrottled, insufficient, podRequestsExceedsThreshold, affected, nil
+	return alreadyThrottled, insufficient, insufficientIncludingGroup, podRequestsExceedsThreshold, affected, nil
 }
 
 // mustSetupEventHandler sets up event handlers. If something wrong happens, it will panic.

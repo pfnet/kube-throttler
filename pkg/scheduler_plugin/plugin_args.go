@@ -37,6 +37,7 @@ type KubeThrottlerPluginArgs struct {
 	TargetSchedulerName                 string        `json:"targetSchedulerName"`
 	ControllerThrediness                int           `json:"controllerThrediness"`
 	NumKeyMutex                         int           `json:"numKeyMutex"`
+	GroupNameAnnotation                 string        `json:"groupNameAnnotation"`
 }
 
 func DecodePluginArgs(configuration runtime.Object) (*KubeThrottlerPluginArgs, error) {
