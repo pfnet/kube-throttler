@@ -109,7 +109,7 @@ func (c *ControllerBase) processNextWorkItem() bool {
 		}
 		// get queued again until another change happens.
 		c.workqueue.Forget(obj)
-		klog.InfoS("Successfully reconciled", c.targetKind, key)
+		klog.V(4).InfoS("Successfully reconciled", c.targetKind, key)
 		return nil
 	}(obj)
 
