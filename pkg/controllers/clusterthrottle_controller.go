@@ -85,7 +85,7 @@ func NewClusterThrottleController(
 }
 
 func (c *ClusterThrottleController) reconcile(key string) error {
-	klog.V(2).InfoS("Reconciling ClusterThrottle", "ClusterThrottle", key)
+	klog.V(4).InfoS("Reconciling ClusterThrottle", "ClusterThrottle", key)
 	ctx := context.Background()
 	now := c.clock.Now()
 
@@ -108,7 +108,7 @@ func (c *ClusterThrottleController) reconcile(key string) error {
 		return err
 	}
 	if len(affectedNonTerminatedPods)+len(affectedTerminatedPods) > 0 {
-		klog.V(2).InfoS(
+		klog.V(4).InfoS(
 			"Affected pods detected",
 			"ClusterThrottle", thr.Namespace+"/"+thr.Name,
 			"#AffectedPods(NonTerminated)", len(affectedNonTerminatedPods),
@@ -189,7 +189,7 @@ func (c *ClusterThrottleController) reconcile(key string) error {
 	} else {
 		c.metricsRecorder.recordClusterThrottleMetrics(thr)
 		reservedAmt, reservedPodNNs := unreserveAffectedPods()
-		klog.V(2).InfoS("No need to update status",
+		klog.V(4).InfoS("No need to update status",
 			"ClusterThrottle", thr.Namespace+"/"+thr.Name,
 			"Threshold", thr.Status.CalculatedThreshold.Threshold,
 			"CalculatedAt", thr.Status.CalculatedThreshold.CalculatedAt,
@@ -206,7 +206,7 @@ func (c *ClusterThrottleController) reconcile(key string) error {
 		return err
 	}
 	if nextOverrideHappensIn != nil {
-		klog.V(3).InfoS("Reconciling after duration", "ClusterThrottle", thr.Namespace+"/"+thr.Name, "After", nextOverrideHappensIn)
+		klog.V(4).InfoS("Reconciling after duration", "ClusterThrottle", thr.Namespace+"/"+thr.Name, "After", nextOverrideHappensIn)
 		c.enqueueAfter(thr, *nextOverrideHappensIn)
 	}
 
