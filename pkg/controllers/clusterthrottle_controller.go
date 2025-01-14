@@ -73,7 +73,7 @@ func NewClusterThrottleController(
 			podInformer:         podInformer,
 			cache:               newReservedResourceAmounts(numKeyMutex),
 			clock:               clock,
-			workqueue:           workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), controllerName),
+			workqueue:           workqueue.NewNamedRateLimitingQueue(workqueue.DefaultTypedControllerRateLimiter[any](), controllerName),
 		},
 		metricsRecorder:         NewClusterThrottleMetricsRecorder(),
 		namespaceInformer:       namespaceInformer,

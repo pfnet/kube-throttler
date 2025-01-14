@@ -71,7 +71,7 @@ func NewThrottleController(
 			podInformer:         podInformer,
 			cache:               newReservedResourceAmounts(numKeyMutex),
 			clock:               clock,
-			workqueue:           workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), controllerName),
+			workqueue:           workqueue.NewNamedRateLimitingQueue(workqueue.DefaultTypedControllerRateLimiter[any](), controllerName),
 		},
 		metricsRecorder:  NewThrottleMetricsRecorder(),
 		throttleInformer: throttleInformer,
