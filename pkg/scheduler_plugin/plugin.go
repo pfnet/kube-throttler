@@ -265,7 +265,7 @@ func (p *KubeThrottler) PreFilterExtensions() framework.PreFilterExtensions {
 	return nil
 }
 
-func (p *KubeThrottler) EventsToRegister() []framework.ClusterEventWithHint {
+func (p *KubeThrottler) EventsToRegister(context.Context) ([]framework.ClusterEventWithHint, error) {
 	throttlesGVK := framework.GVK(fmt.Sprintf("throttles.%v.%v", schedulev1alpha1.SchemeGroupVersion.Version, schedulev1alpha1.SchemeGroupVersion.Group))
 	clusterthrottlesGVK := framework.GVK(fmt.Sprintf("clusterthrottles.%v.%v", schedulev1alpha1.SchemeGroupVersion.Version, schedulev1alpha1.SchemeGroupVersion.Group))
 	return []framework.ClusterEventWithHint{
@@ -291,7 +291,7 @@ func (p *KubeThrottler) EventsToRegister() []framework.ClusterEventWithHint {
 				ActionType: framework.All,
 			},
 		},
-	}
+	}, nil
 }
 
 func throttleNames(objs []schedulev1alpha1.Throttle) []string {

@@ -41,8 +41,9 @@ type ControllerBase struct {
 	podInformer       corev1informer.PodInformer
 	cache             *reservedResourceAmounts
 
-	clock     clock.Clock
-	workqueue workqueue.RateLimitingInterface
+	clock clock.Clock
+	// TOOD(utam0k): Specify the type of `workqueue`. I'm not sure but I passed `string`` here and didn't pass the integration test.
+	workqueue workqueue.TypedRateLimitingInterface[any]
 
 	reconcileFunc func(key string) error
 

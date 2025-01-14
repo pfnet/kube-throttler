@@ -126,7 +126,7 @@ export INTEGRATION_GOMEGA_DEFAULT_CONSISTENTLY_DURATION=2s
 INTEGRATION_PAUSE_IMAGE=k8s.gcr.io/pause:3.2
 INTEGRATION_KIND_KUBECNOFIG = $(DEV_TOOL_PREFIX)/.kubeconfig
 INTEGRATION_KIND_CONF=./hack/integration/kind.conf
-INTEGRATION_NODE_IMAGE ?= kindest/node:v1.30.0
+INTEGRATION_NODE_IMAGE ?= kindest/node:v1.31.4
 integration-setup:
 	$(KIND) get clusters | grep kube-throttler-integration 2>&1 >/dev/null \
 	  || $(KIND) create cluster --name=kube-throttler-integration \
