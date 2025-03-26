@@ -487,7 +487,9 @@ func (c *ClusterThrottleController) mustSetupEventHandler() {
 	if err != nil {
 		panic(fmt.Errorf("failed to add event handler in namespace informer: %w", err))
 	}
-	_, err = c.clusterthrottleInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
+
+	// Disable resync as `UpdateFunc` is heavy on large clusters.
+	_, err = c.clusterthrottleInformer.Informer().AddEventHandlerWithResyncPeriod(cache.ResourceEventHandlerFuncs{
 		AddFunc: func(obj interface{}) {
 			thr := obj.(*schedulev1alpha1.ClusterThrottle)
 			if !c.isResponsibleFor(thr) {
@@ -513,7 +515,7 @@ func (c *ClusterThrottleController) mustSetupEventHandler() {
 			klog.V(4).InfoS("Delete event", "ClusterThrottle", thr.Name)
 			c.enqueue(thr)
 		},
-	})
+	}, 0)
 	if err != nil {
 		panic(fmt.Errorf("failed to add event handler in cluster throttle informer: %w", err))
 	}
