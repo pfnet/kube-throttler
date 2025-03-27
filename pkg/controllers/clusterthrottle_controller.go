@@ -488,8 +488,7 @@ func (c *ClusterThrottleController) mustSetupEventHandler() {
 		panic(fmt.Errorf("failed to add event handler in namespace informer: %w", err))
 	}
 
-	// Disable resync as `UpdateFunc` is heavy on large clusters.
-	_, err = c.clusterthrottleInformer.Informer().AddEventHandlerWithResyncPeriod(cache.ResourceEventHandlerFuncs{
+	_, err = c.clusterthrottleInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
 		AddFunc: func(obj interface{}) {
 			thr := obj.(*schedulev1alpha1.ClusterThrottle)
 			if !c.isResponsibleFor(thr) {
@@ -515,12 +514,13 @@ func (c *ClusterThrottleController) mustSetupEventHandler() {
 			klog.V(4).InfoS("Delete event", "ClusterThrottle", thr.Name)
 			c.enqueue(thr)
 		},
-	}, 0)
+	})
 	if err != nil {
 		panic(fmt.Errorf("failed to add event handler in cluster throttle informer: %w", err))
 	}
 
-	_, err = c.podInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
+	// Disable resync as `UpdateFunc` is heavy on large clusters.
+	_, err = c.podInformer.Informer().AddEventHandlerWithResyncPeriod(cache.ResourceEventHandlerFuncs{
 		AddFunc: func(obj interface{}) {
 			pod := obj.(*corev1.Pod)
 			if !c.shouldCountIn(pod) {
@@ -622,7 +622,7 @@ func (c *ClusterThrottleController) mustSetupEventHandler() {
 				c.enqueue(thr)
 			}
 		},
-	})
+	}, 0)
 	if err != nil {
 		panic(fmt.Errorf("failed to add event handler in pod informer: %w", err))
 	}
