@@ -19,7 +19,7 @@ fmt:
 
 .PHONY: lint
 lint: fmt
-	$(GOLANGCI_LINT) run --config .golangci.yml --deadline 30m
+	$(GOLANGCI_LINT) run --config .golangci.yml --timeout 30m
 
 .PHONY: build
 build: fmt lint
@@ -87,7 +87,7 @@ setup:
 	GOBIN=$(DEV_TOOL_PREFIX)/bin go install $(CODEGEN_PKG_NAME)/cmd/informer-gen@$(CODEGEN_PKG_VERSION)
 	GOBIN=$(DEV_TOOL_PREFIX)/bin go install $(CODEGEN_PKG_NAME)/cmd/deepcopy-gen@$(CODEGEN_PKG_VERSION)
 	GOBIN=$(DEV_TOOL_PREFIX)/bin go install sigs.k8s.io/kind@latest
-	GOBIN=$(DEV_TOOL_PREFIX)/bin go install github.com/golangci/golangci-lint/cmd/golangci-lint@v1.52.2
+	GOBIN=$(DEV_TOOL_PREFIX)/bin go install github.com/golangci/golangci-lint/cmd/golangci-lint@v1.64.8
 
 #
 # local development
