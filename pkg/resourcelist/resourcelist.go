@@ -20,13 +20,13 @@ package resourcelist
 import (
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
-	v1resource "k8s.io/kubernetes/pkg/api/v1/resource"
+	helpers "k8s.io/component-helpers/resource"
 )
 
 type ResourceList corev1.ResourceList
 
 func PodRequestResourceList(pod *corev1.Pod) ResourceList {
-	return ResourceList(v1resource.PodRequests(pod, v1resource.PodResourcesOptions{}))
+	return ResourceList(helpers.PodRequests(pod, helpers.PodResourcesOptions{}))
 }
 
 func (lhs ResourceList) Add(rhs ResourceList) {
