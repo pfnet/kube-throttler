@@ -266,8 +266,8 @@ func (p *KubeThrottler) PreFilterExtensions() framework.PreFilterExtensions {
 }
 
 func (p *KubeThrottler) EventsToRegister(context.Context) ([]framework.ClusterEventWithHint, error) {
-	throttlesGVK := framework.GVK(fmt.Sprintf("throttles.%v.%v", schedulev1alpha1.SchemeGroupVersion.Version, schedulev1alpha1.SchemeGroupVersion.Group))
-	clusterthrottlesGVK := framework.GVK(fmt.Sprintf("clusterthrottles.%v.%v", schedulev1alpha1.SchemeGroupVersion.Version, schedulev1alpha1.SchemeGroupVersion.Group))
+	throttlesGVK := framework.EventResource(fmt.Sprintf("throttles.%v.%v", schedulev1alpha1.SchemeGroupVersion.Version, schedulev1alpha1.SchemeGroupVersion.Group))
+	clusterthrottlesGVK := framework.EventResource(fmt.Sprintf("clusterthrottles.%v.%v", schedulev1alpha1.SchemeGroupVersion.Version, schedulev1alpha1.SchemeGroupVersion.Group))
 	return []framework.ClusterEventWithHint{
 		{
 			Event: framework.ClusterEvent{

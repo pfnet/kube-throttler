@@ -19,7 +19,7 @@ fmt:
 
 .PHONY: lint
 lint: fmt
-	$(GOLANGCI_LINT) run --config .golangci.yml --deadline 30m
+	$(GOLANGCI_LINT) run --config .golangci.yml --timeout 30m
 
 .PHONY: build
 build: fmt lint
@@ -87,7 +87,7 @@ setup:
 	GOBIN=$(DEV_TOOL_PREFIX)/bin go install $(CODEGEN_PKG_NAME)/cmd/informer-gen@$(CODEGEN_PKG_VERSION)
 	GOBIN=$(DEV_TOOL_PREFIX)/bin go install $(CODEGEN_PKG_NAME)/cmd/deepcopy-gen@$(CODEGEN_PKG_VERSION)
 	GOBIN=$(DEV_TOOL_PREFIX)/bin go install sigs.k8s.io/kind@latest
-	GOBIN=$(DEV_TOOL_PREFIX)/bin go install github.com/golangci/golangci-lint/cmd/golangci-lint@v1.52.2
+	GOBIN=$(DEV_TOOL_PREFIX)/bin go install github.com/golangci/golangci-lint/cmd/golangci-lint@v1.64.8
 
 #
 # local development
@@ -126,7 +126,7 @@ export INTEGRATION_GOMEGA_DEFAULT_CONSISTENTLY_DURATION=2s
 INTEGRATION_PAUSE_IMAGE=k8s.gcr.io/pause:3.2
 INTEGRATION_KIND_KUBECNOFIG = $(DEV_TOOL_PREFIX)/.kubeconfig
 INTEGRATION_KIND_CONF=./hack/integration/kind.conf
-INTEGRATION_NODE_IMAGE ?= kindest/node:v1.31.4
+INTEGRATION_NODE_IMAGE ?= kindest/node:v1.32.3
 integration-setup:
 	$(KIND) get clusters | grep kube-throttler-integration 2>&1 >/dev/null \
 	  || $(KIND) create cluster --name=kube-throttler-integration \
